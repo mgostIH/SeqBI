@@ -49,30 +49,30 @@ class CompleteAutoregressiveModel(eqx.Module):
         self.model_dim = model_dim
         self.logits_dim = logits_dim
 
-    def __call__(self, x : Int[Array, "seq_len"]) -> Float[Array, "seq_len logits_dim"]:
+    def __call__(self, x : Int[Array, "seq_len"], *, key : PRNGKeyArray = None) -> Float[Array, "seq_len logits_dim"]:
         # Embedding the input tokens
         x = jax.vmap(self.embedding)(x)
         # Applying the autoregressive model
-        x = self.autoregressive_model(x)
+        x = self.autoregressive_model(x, key=key)
         # Projecting each vector to a logits vector
         x = jax.vmap(self.projection)(x)
         return x
     
-    def embed_no_logits(self, x : Int[Array, "seq_len"]) -> Float[Array, "seq_len model_dim"]:
+    def embed_no_logits(self, x : Int[Array, "seq_len"], *, key : PRNGKeyArray = None) -> Float[Array, "seq_len model_dim"]:
         # Embedding the input tokens
         x = jax.vmap(self.embedding)(x)
         # Applying the autoregressive model
-        x = self.autoregressive_model(x)
+        x = self.autoregressive_model(x, key=key)
         return x
 
-    def simple_cross_entropy_loss_on_tokens(self, x : Int[Array, "seq_len"]) -> Float[Array, ""]:
+    def simple_cross_entropy_loss_on_tokens(self, x : Int[Array, "seq_len"], *, key : PRNGKeyArray = None) -> Float[Array, ""]:
         input = prepare_for_autoregressive_model(x)
         # Computing the logits
-        logits = self(input)
+        logits = self(input, key=key)
         # Computing the loss
         loss = sequence_cross_entropy(logits, x)
-        # Summing the loss over the sequence length
-        return jnp.sum(loss)
+        # Averaging the loss over the sequence length
+        return jnp.mean(loss)
     
 # A helper function that takes a sequence of tokens to predict, prepends a start token and removes the last token
 # This is useful for training since we want to predict the next token given the previous tokens
