@@ -24,16 +24,14 @@ class CausalTransformer(eqx.Module):
     model_dim : Int[Array, ""]
     num_heads : Int[UInt, ""]
     attn_dropout : Float[Array, ""]
-    vocab_size : Int[UInt, ""]
     num_layers : Int[UInt, ""]
     hidden_dim : Int[Array, ""]
 
-    def __init__(self, model_dim : Int[Array, ""], num_heads : Int[UInt, ""], attn_dropout : Float[Array, ""], vocab_size : Int[UInt, ""], num_layers : Int[UInt, ""], hidden_dim : Int[Array, ""], *, key : PRNGKeyArray = None):
+    def __init__(self, model_dim : Int[Array, ""], num_heads : Int[UInt, ""], attn_dropout : Float[Array, ""], num_layers : Int[UInt, ""], hidden_dim : Int[Array, ""], *, key : PRNGKeyArray = None):
         super().__init__()
         self.model_dim = model_dim
         self.num_heads = num_heads
         self.attn_dropout = attn_dropout
-        self.vocab_size = vocab_size
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
         self.norm = SmoothNorm(model_dim)
