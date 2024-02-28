@@ -63,8 +63,8 @@ class CausalTransformer(eqx.Module):
                                        for key_linear_i in jax.random.split(key_linear, 3)] 
                                        for key_linear in jax.random.split(key_linears, num_layers)]
 
-    def __call__(self, x : Float[Array, "seq dim"], *, key : PRNGKeyArray) -> Float[Array, "seq dim"]:
-        dropout_keys = jax.random.split(key, self.num_layers)
+    def __call__(self, x : Float[Array, "seq dim"], *, key : PRNGKeyArray = None) -> Float[Array, "seq dim"]:
+        dropout_keys = jax.random.split(key, self.num_layers) if key is not None else [None] * self.num_layers
         for i in range(self.num_layers):
             x_res = x
             x = eqx.filter_vmap(self.norm)(x)

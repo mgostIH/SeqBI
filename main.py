@@ -9,16 +9,16 @@ import json
 
 # Parameters of the environment
 setup_parameters = {
-    "sequences" : 1_000, # Number of sequences to generate
-    "seq_len" : 20, # Length of each sequence 
-    "vocab_size" : 5, # Size of the vocabulary
+    "sequences" : 10_000, # Number of sequences to generate
+    "seq_len" : 10, # Length of each sequence 
+    "vocab_size" : 5+1, # Size of the vocabulary (5 observations + start token)
     "test_size" : 0.2, # Size of the test set
     "rng_seed" : 1337, # Random number generator seed
 }
 
 training_parameters = {
     "learning_rate" : 3e-4, # Learning rate
-    "epochs" : 100, # Number of epochs
+    "epochs" : 500, # Number of epochs
     "batch_size" : 128, # Batch size
     "optimizer" : optax.adam, # Optimizer
 }
@@ -27,7 +27,7 @@ model_parameters = {
     "model_dim" : 32, # Dimension of the model
     "num_heads" : 4, # Number of heads in the transformer
     "attn_dropout" : 0.0, # Dropout in the transformer
-    "num_layers" : 4, # Number of layers in the transformer
+    "num_layers" : 3, # Number of layers in the transformer
     "hidden_dim" : 32, # Hidden dimension in the transformer
 }
 
@@ -69,25 +69,21 @@ def initialize_model(setup_parameters, model_parameters, training_parameters, ke
         return model, opt_state, optimizer
 
 
-def generate_sequences(setup_parameters, markov_key):
+def generate_sequences(seq_amount, seq_len, markov_key):
     # Generate data
     # Setup an empty matrix of size (sequences, seq_len) to store the sequences
     # Use int8 to save memory
-    sequences = jnp.zeros((setup_parameters["sequences"], setup_parameters["seq_len"]), dtype=jnp.int8)
+    sequences = jnp.zeros((seq_amount, seq_len), dtype=jnp.int8)
     # Generate the sequences
-    for i in range(setup_parameters["sequences"]):
-        sequence_seeds = jax.random.split(markov_key, setup_parameters["sequences"])
-        sequence = data_gen.generate_markov_sequence(setup_parameters["seq_len"], seed=int(sequence_seeds[i][0]))
+    for i in range(seq_amount):
+        sequence_seeds = jax.random.split(markov_key, seq_amount)
+        sequence = data_gen.generate_markov_sequence(seq_len, seed=int(sequence_seeds[i][0]))
         # A sequence here is made of letters A, B, C, F, N, convert them to 0 1 2 3 4
         letter_map = {"A" : 0, "B" : 1, "C" : 2, "F" : 3, "N" : 4}
         sequence = [letter_map[letter] for letter in sequence]
         sequence = jnp.array(sequence, dtype=jnp.int8)
         sequences = sequences.at[i].set(sequence)
-    # Split the data into training and test
-    test_size = int(setup_parameters["sequences"] * setup_parameters["test_size"])
-    train_sequences = sequences[:-test_size]
-    test_sequences = sequences[-test_size:]
-    return train_sequences, test_sequences
+    return sequences
 
 def loss_fn(model, batch, dropout_key):
     f = lambda x, key : model.simple_cross_entropy_loss_on_tokens(x, key=key)
@@ -115,7 +111,7 @@ def training_loop(model, opt_state, optimizer, train_sequences, training_paramet
 
 
 key = jax.random.PRNGKey(setup_parameters["rng_seed"])
-
+later_key, key = jax.random.split(key) # Used to make saved and trained model rng the same after try
 # Check if the model is saved and load it if it is
 try:
     model, model_parameters = load_model("model.eqx")
@@ -125,11 +121,25 @@ except FileNotFoundError:
     model, opt_state, optimizer = initialize_model(setup_parameters, model_parameters, training_parameters, init_key)
     print("Model initialized")
     markov_key, key = jax.random.split(key)
-    train_sequences, test_sequences = generate_sequences(setup_parameters, markov_key)
+    train_sequences = generate_sequences(setup_parameters["sequences"], setup_parameters["seq_len"], markov_key)
+    print("Data generated")
     train_key, key = jax.random.split(key)
     training_loop(model, opt_state, optimizer, train_sequences, training_parameters, train_key)
     save_model(model, "model.eqx")
     print("Model saved")
 
-# Usage:
+key = later_key
+model = eqx.nn.inference_mode(model)
+
+# Generate a test sequence
+test_key, key = jax.random.split(key)
+test_sequence = generate_sequences(1, setup_parameters["seq_len"], test_key)
+test_sequence = ar.prepare_for_autoregressive_model(test_sequence[0])
+print("Test sequence generated")
+print("Test sequence:", test_sequence)
+
+# Calculate logits for the test sequence
+logits = model(test_sequence)
+print("Logits for the test sequence:", logits)
+
 
