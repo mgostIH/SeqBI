@@ -2,7 +2,7 @@ import numpy as np
 
 import numpy as np
 
-def generate_markov_sequence(T, observation_flag=True):
+def generate_markov_sequence(T, observation_flag=True, seed=None):
     # Define the transition matrix for the Markov chain
     # Rows are current states, columns are next states: [A, B, C, F]
     transition_matrix = np.array([
@@ -15,22 +15,23 @@ def generate_markov_sequence(T, observation_flag=True):
     # Initialize the sequence
     state_labels = ['A', 'B', 'C', 'F']
     current_state = 0  # Start at state A
-    observations = []
+    states = []
+
+    # Create a random number generator with the given seed
+    rng = np.random.default_rng(seed)
 
     for _ in range(T):
         # Transition to next state
-        current_state = np.random.choice(4, p=transition_matrix[current_state])
+        current_state = rng.choice(4, p=transition_matrix[current_state])
+        states.append(state_labels[current_state])
 
-        # Decide whether to output the state or N based on the observation flag
-        if observation_flag and np.random.rand() < 0.5:
-            observations.append(state_labels[current_state])
-        elif observation_flag:
-            observations.append('N')
-        else:
-            # If observation flag is off, always output the state
-            observations.append(state_labels[current_state])
+    # Determine whether to swap the state with 'N' based on 50% probability
+    if observation_flag:
+        for i in range(len(states)):
+            if rng.random() < 0.5:
+                states[i] = 'N'
 
-    return observations
+    return states
 
 def w(p):
     """Convert probability to weight."""

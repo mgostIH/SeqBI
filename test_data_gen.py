@@ -1,11 +1,22 @@
 from data_gen import generate_markov_sequence, viterbi_algorithm, w
 import numpy as np
 
+
+
+seq_amount = 30
+seq_len = 10
+
 # Generate and print sequences with observation flag on and off for debugging
-sequences_with_obs = [generate_markov_sequence(10) for _ in range(5)]
-sequences_without_obs = [generate_markov_sequence(10, observation_flag=False) for _ in range(5)]
+sequences_with_obs = [generate_markov_sequence(seq_len, seed=i) for i in range(seq_amount)]
+sequences_without_obs = [generate_markov_sequence(seq_len, seed=i, observation_flag=False) for i in range(seq_amount)]
 
 sequences_with_obs, sequences_without_obs
+
+# Test: Check whether sequences_with_obs is the same as sequences_without_obs except for the 'N' tokens
+for i in range(seq_amount):
+    for j in range(seq_len):
+        if sequences_with_obs[i][j] != 'N':
+            assert sequences_with_obs[i][j] == sequences_without_obs[i][j]
 
 # Example usage
 S = 4  # Number of states
