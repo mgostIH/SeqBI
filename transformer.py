@@ -50,6 +50,7 @@ class CausalTransformer(eqx.Module):
             num_heads=num_heads,
             query_size=model_dim,
             dropout_p=attn_dropout,
+
             key=key_attn_i) for key_attn_i in jax.random.split(key_attn, num_layers)]
         
         # One linear for queries, one for keys, one for values
@@ -65,7 +66,8 @@ class CausalTransformer(eqx.Module):
                 x_res = x
                 x = eqx.filter_vmap(self.norm)(x)
                 q, k, v = [eqx.filter_vmap(linear)(x) for linear in self.linears[i]]
-                attn = self.attns[i](q, k, v)
+                mask = jnp.tril(jnp.ones((x.shape[0], x.shape[0])))
+                attn = self.attns[i](q, k, v, mask=mask)
                 mlp_out = eqx.filter_vmap(self.mlps[i])(attn)
                 x = x_res + mlp_out + attn
             return x
