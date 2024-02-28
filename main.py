@@ -17,18 +17,18 @@ setup_parameters = {
 }
 
 training_parameters = {
-    "learning_rate" : 3e-4, # Learning rate
+    "learning_rate" : 1e-4, # Learning rate
     "epochs" : 500, # Number of epochs
-    "batch_size" : 128, # Batch size
+    "batch_size" : 32, # Batch size
     "optimizer" : optax.adam, # Optimizer
 }
 
 model_parameters = {
-    "model_dim" : 32, # Dimension of the model
+    "model_dim" : 128, # Dimension of the model
     "num_heads" : 4, # Number of heads in the transformer
     "attn_dropout" : 0.0, # Dropout in the transformer
-    "num_layers" : 3, # Number of layers in the transformer
-    "hidden_dim" : 32, # Hidden dimension in the transformer
+    "num_layers" : 4, # Number of layers in the transformer
+    "hidden_dim" : 128, # Hidden dimension in the transformer
 }
 
 
@@ -107,7 +107,8 @@ def training_loop(model, opt_state, optimizer, train_sequences, training_paramet
                 model, opt_state, loss = train_step(model, opt_state, optimizer, batch, dropout_key)
             print(f"Epoch {epoch} - Loss: {loss}")
     except KeyboardInterrupt:
-        return
+        pass
+    return model, opt_state, loss
 
 
 key = jax.random.PRNGKey(setup_parameters["rng_seed"])
@@ -124,12 +125,12 @@ except FileNotFoundError:
     train_sequences = generate_sequences(setup_parameters["sequences"], setup_parameters["seq_len"], markov_key)
     print("Data generated")
     train_key, key = jax.random.split(key)
-    training_loop(model, opt_state, optimizer, train_sequences, training_parameters, train_key)
+    model, _, _ = training_loop(model, opt_state, optimizer, train_sequences, training_parameters, train_key)
     save_model(model, "model.eqx")
     print("Model saved")
 
 key = later_key
-model = eqx.nn.inference_mode(model)
+#model = eqx.nn.inference_mode(model)
 
 # Generate a test sequence
 test_key, key = jax.random.split(key)
@@ -139,7 +140,7 @@ print("Test sequence generated")
 print("Test sequence:", test_sequence)
 
 # Calculate logits for the test sequence
-logits = model(test_sequence)
+logits = model(test_sequence, key=test_key)
 print("Logits for the test sequence:", logits)
 
 
