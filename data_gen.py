@@ -1,6 +1,7 @@
 import numpy as np
 
-import numpy as np
+import jax.numpy as jnp
+import jax
 
 def generate_markov_sequence(T, observation_flag=True, seed=None):
     # Define the transition matrix for the Markov chain
@@ -33,6 +34,36 @@ def generate_markov_sequence(T, observation_flag=True, seed=None):
                 states[i] = 'N'
 
     return states
+
+def jax_generate_markov_sequence(T, key):
+    # Define the transition matrix for the Markov chain
+    # Rows are current states, columns are next states: [A, B, C, F]
+    transition_matrix = jnp.array([
+        [0.6, 0.4, 0.0, 0.0],  # A -> A, B
+        [0.6, 0.0, 0.4, 0.0],  # B -> A, C
+        [0.0, 0.6, 0.0, 0.4],  # C -> B, F
+        [0.0, 0.0, 0.0, 1.0]   # F -> F
+    ])
+
+    # Initialize the sequence
+    state_labels = jnp.array([0, 1, 2, 3])
+    current_state = 0  # Start at state A
+    states = []
+
+    for _ in range(T):
+        choice_key, key = jax.random.split(key)
+        states.append(state_labels[current_state])
+        # Transition to next state
+        current_state = jax.random.choice(choice_key, 4, p=transition_matrix[current_state])
+        
+
+    # Determine whether to swap the state with 'N' based on 50% probability
+    for i in range(len(states)):
+        unif_key, key = jax.random.split(key)
+        states[i] = jax.lax.select(jax.random.uniform(unif_key) < 0.5, 4, states[i])
+
+    return jnp.array(states)
+
 
 def w(p):
     """Convert probability to weight."""

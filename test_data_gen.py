@@ -1,6 +1,7 @@
-from data_gen import generate_markov_sequence, viterbi_algorithm, w
+from data_gen import generate_markov_sequence, viterbi_algorithm, w, jax_generate_markov_sequence
 import numpy as np
-
+import jax
+import jax.numpy as jnp
 
 
 seq_amount = 30
@@ -44,3 +45,8 @@ DP, best_path = viterbi_algorithm(state_transition_prob, observation_prob_matrix
 DP, best_path
 
 # The above has been tested manually and is correct
+
+# Sample sequences using jax
+key = jax.random.PRNGKey(0)
+seq_keys = jax.random.split(key, seq_amount)
+jax_sequences_with_obs = jax.vmap(jax_generate_markov_sequence, in_axes=(None, 0))(seq_len, seq_keys)
