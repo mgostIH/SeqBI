@@ -21,9 +21,10 @@ def generate_markov_sequence(T, observation_flag=True, seed=None):
     rng = np.random.default_rng(seed)
 
     for _ in range(T):
+        states.append(state_labels[current_state])
         # Transition to next state
         current_state = rng.choice(4, p=transition_matrix[current_state])
-        states.append(state_labels[current_state])
+        
 
     # Determine whether to swap the state with 'N' based on 50% probability
     if observation_flag:
