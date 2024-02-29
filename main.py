@@ -3,23 +3,24 @@ import autoregressive as ar
 import optax
 import jax
 import jax.numpy as jnp
+import numpy as np
 import equinox as eqx
 import data_gen
 import json
 
 # Parameters of the environment
 setup_parameters = {
-    "sequences" : 10_000, # Number of sequences to generate
-    "seq_len" : 10, # Length of each sequence 
+    "sequences" : 100_000, # Number of sequences to generate
+    "seq_len" : 20, # Length of each sequence 
     "vocab_size" : 5+1, # Size of the vocabulary (5 observations + start token)
     "test_size" : 0.2, # Size of the test set
     "rng_seed" : 1337, # Random number generator seed
 }
 
 training_parameters = {
-    "learning_rate" : 1e-4, # Learning rate
-    "epochs" : 500, # Number of epochs
-    "batch_size" : 32, # Batch size
+    "learning_rate" : 3e-4, # Learning rate
+    "epochs" : 100, # Number of epochs
+    "batch_size" : 128, # Batch size
     "optimizer" : optax.adam, # Optimizer
 }
 
@@ -27,7 +28,7 @@ model_parameters = {
     "model_dim" : 128, # Dimension of the model
     "num_heads" : 4, # Number of heads in the transformer
     "attn_dropout" : 0.0, # Dropout in the transformer
-    "num_layers" : 4, # Number of layers in the transformer
+    "num_layers" : 3, # Number of layers in the transformer
     "hidden_dim" : 128, # Hidden dimension in the transformer
 }
 
@@ -70,19 +71,8 @@ def initialize_model(setup_parameters, model_parameters, training_parameters, ke
 
 
 def generate_sequences(seq_amount, seq_len, markov_key):
-    # Generate data
-    # Setup an empty matrix of size (sequences, seq_len) to store the sequences
-    # Use int8 to save memory
-    sequences = jnp.zeros((seq_amount, seq_len), dtype=jnp.int8)
-    # Generate the sequences
-    for i in range(seq_amount):
-        sequence_seeds = jax.random.split(markov_key, seq_amount)
-        sequence = data_gen.generate_markov_sequence(seq_len, seed=int(sequence_seeds[i][0]))
-        # A sequence here is made of letters A, B, C, F, N, convert them to 0 1 2 3 4
-        letter_map = {"A" : 0, "B" : 1, "C" : 2, "F" : 3, "N" : 4}
-        sequence = [letter_map[letter] for letter in sequence]
-        sequence = jnp.array(sequence, dtype=jnp.int8)
-        sequences = sequences.at[i].set(sequence)
+    seq_keys = jax.random.split(markov_key, seq_amount)
+    sequences = eqx.filter_vmap(data_gen.jax_generate_markov_sequence, in_axes=(None, 0))(seq_len, seq_keys)
     return sequences
 
 def loss_fn(model, batch, dropout_key):
@@ -134,13 +124,16 @@ key = later_key
 
 # Generate a test sequence
 test_key, key = jax.random.split(key)
-test_sequence = generate_sequences(1, setup_parameters["seq_len"], test_key)
-test_sequence = ar.prepare_for_autoregressive_model(test_sequence[0])
-print("Test sequence generated")
-print("Test sequence:", test_sequence)
+test_sequences = generate_sequences(10, setup_parameters["seq_len"], test_key)
+test_sequences = eqx.filter_vmap(ar.prepare_for_autoregressive_model)(test_sequences)
 
+print("Test sequences generated")
+print("Test sequences:", test_sequences)
+
+test_sequence = test_sequences[0]
 # Calculate logits for the test sequence
 logits = model(test_sequence, key=test_key)
-print("Logits for the test sequence:", logits)
+jnp.set_printoptions(suppress=True, precision=3)
+print(f"Logits for the test sequence: \n{logits}")
 
 
