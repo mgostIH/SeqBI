@@ -39,7 +39,7 @@ observation_prob_matrix = np.array([
 ])
 
 initial_distribution = np.array([1, 0, 0, 0])
-observations = [4, 4, 2]  # Example observation sequence (indices)
+observations = [0, 1, 0, 1, 4, 4, 4]  # Example observation sequence (indices)
 
 DP, best_path = viterbi_algorithm(state_transition_prob, observation_prob_matrix, observations, initial_distribution)
 DP, best_path

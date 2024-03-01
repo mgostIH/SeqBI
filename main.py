@@ -131,9 +131,35 @@ print("Test sequences generated")
 print("Test sequences:", test_sequences)
 
 test_sequence = test_sequences[0]
+
+test_sequence = jnp.array([-1, 0, 1, 0, 1, 4, 4], dtype=jnp.int8)
 # Calculate logits for the test sequence
 logits = model(test_sequence, key=test_key)
 jnp.set_printoptions(suppress=True, precision=3)
 print(f"Logits for the test sequence: \n{logits}")
+
+probabilities = eqx.filter_vmap(jax.nn.softmax)(logits)
+print(f"Probabilities for the test sequence: \n{probabilities}")
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Generating a (20, 5) tensor with random probabilities
+# Each row will sum to 1
+probabilities = probabilities[:, :-1]
+
+# Column labels
+columns = ['A', 'B', 'C', 'F', 'N']
+
+# Creating the heatmap
+plt.figure(figsize=(10, 8))
+sns.heatmap(probabilities, annot=True, cmap="YlGnBu", fmt=".3f", xticklabels=columns)
+
+plt.title('Probability Distribution Heatmap')
+plt.ylabel('Sample Index')
+plt.xlabel('Object Label')
+
+# Show the plot
+plt.show()
 
 
