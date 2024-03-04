@@ -36,6 +36,26 @@ def generate_markov_sequence(T, observation_flag=True, seed=None):
     return states
 
 def jax_generate_markov_sequence(T, key):
+    gen_key, hide_key = jax.random.split(key)
+    states = jax_generate_markov_states(T, gen_key)
+    return jax_hide_states(states, hide_key)
+
+# Assume filter is a function that takes a single row, a key and returns true or false
+def jax_generate_filtered_markov_matrix(T, N, filter, key):
+    gen_key, hide_key = jax.random.split(key)
+    hide_keys = jax.random.split(hide_key, N)
+    generated_states = jnp.zeros((0, T), dtype=jnp.int8)
+    while generated_states.shape[0] < N:
+        gen_key, filter_key = jax.random.split(gen_key)
+        gen_keys = jax.random.split(gen_key, N)
+        filter_keys = jax.random.split(filter_key, N)
+        states = jax.vmap(jax_generate_markov_states, in_axes=(None, 0))(T, gen_keys)
+        row_mask = jax.vmap(filter, in_axes=(0, 0))(states, filter_keys) # (N,)
+        generated_states = jnp.vstack([generated_states, states[row_mask]])
+
+    return jax.vmap(jax_hide_states, in_axes=(0, 0))(generated_states[:N], hide_keys)
+
+def jax_generate_markov_states(T, key):
     # Define the transition matrix for the Markov chain
     # Rows are current states, columns are next states: [A, B, C, F]
     transition_matrix = jnp.array([
@@ -55,14 +75,11 @@ def jax_generate_markov_sequence(T, key):
         states.append(state_labels[current_state])
         # Transition to next state
         current_state = jax.random.choice(choice_key, 4, p=transition_matrix[current_state])
-        
-
-    # Determine whether to swap the state with 'N' based on 50% probability
-    for i in range(len(states)):
-        unif_key, key = jax.random.split(key)
-        states[i] = jax.lax.select(jax.random.uniform(unif_key) < 0.5, 4, states[i])
-
     return jnp.array(states)
+
+def jax_hide_states(states, key):
+    mask = jax.random.bernoulli(key, 0.5, shape=states.shape)
+    return jnp.where(mask, 4, states)
 
 
 def w(p):

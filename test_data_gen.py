@@ -1,11 +1,11 @@
-from data_gen import generate_markov_sequence, viterbi_algorithm, w, jax_generate_markov_sequence
+from data_gen import *
 import numpy as np
 import jax
 import jax.numpy as jnp
 
 
 seq_amount = 30
-seq_len = 10
+seq_len = 20
 
 # Generate and print sequences with observation flag on and off for debugging
 sequences_with_obs = [generate_markov_sequence(seq_len, seed=i) for i in range(seq_amount)]
@@ -50,3 +50,7 @@ DP, best_path
 key = jax.random.PRNGKey(0)
 seq_keys = jax.random.split(key, seq_amount)
 jax_sequences_with_obs = jax.vmap(jax_generate_markov_sequence, in_axes=(None, 0))(seq_len, seq_keys)
+
+key, _ = jax.random.split(key)
+filter = lambda x, key : ~jnp.any(x[:10] == 3)
+jax_sequences_with_obs_filtered = jax_generate_filtered_markov_matrix(seq_len, seq_amount, filter, key)
