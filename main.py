@@ -20,7 +20,7 @@ setup_parameters = {
 training_parameters = {
     "learning_rate" : 3e-4, # Learning rate
     "epochs" : 100, # Number of epochs
-    "batch_size" : 128, # Batch size
+    "batch_size" : 1000, # Batch size
     "optimizer" : optax.adam, # Optimizer
 }
 
@@ -80,21 +80,22 @@ def loss_fn(model, batch, dropout_key):
     losses = eqx.filter_vmap(f, in_axes=(0, None))(batch, dropout_key)
     return jnp.mean(losses)
 
-@eqx.filter_jit
-def train_step(model, opt_state, optimizer, batch, dropout_key):
-    loss, grads = eqx.filter_value_and_grad(loss_fn)(model, batch, dropout_key)
-    updates, new_opt_state = optimizer.update(grads, opt_state, model)
-    new_model = eqx.apply_updates(model, updates)
-    return new_model, new_opt_state, loss
+
 
 
 def training_loop(model, opt_state, optimizer, train_sequences, training_parameters, key):
+    @eqx.filter_jit
+    def train_step(model, opt_state, batch, dropout_key):
+        loss, grads = eqx.filter_value_and_grad(loss_fn)(model, batch, dropout_key)
+        updates, new_opt_state = optimizer.update(grads, opt_state, model)
+        new_model = eqx.apply_updates(model, updates)
+        return new_model, new_opt_state, loss
     try:
         for epoch in range(training_parameters["epochs"]):
             for i in range(0, len(train_sequences), training_parameters["batch_size"]):
                 dropout_key, key = jax.random.split(key)
                 batch = train_sequences[i:i+training_parameters["batch_size"]]
-                model, opt_state, loss = train_step(model, opt_state, optimizer, batch, dropout_key)
+                model, opt_state, loss = train_step(model, opt_state, batch, dropout_key)
             print(f"Epoch {epoch} - Loss: {loss}")
     except KeyboardInterrupt:
         pass
@@ -106,17 +107,32 @@ later_key, key = jax.random.split(key) # Used to make saved and trained model rn
 # Check if the model is saved and load it if it is
 try:
     model, model_parameters = load_model("model.eqx")
+    model_filtered, _ = load_model("model_filtered.eqx")
     print("Model loaded")
 except FileNotFoundError:
-    init_key, key = jax.random.split(key)
+    init_key, init_key_2, key = jax.random.split(key, 3)
     model, opt_state, optimizer = initialize_model(setup_parameters, model_parameters, training_parameters, init_key)
+    model_filtered, opt_state_filtered, optimizer_filtered = initialize_model(setup_parameters, model_parameters, training_parameters, init_key_2)
     print("Model initialized")
     markov_key, key = jax.random.split(key)
     train_sequences = generate_sequences(setup_parameters["sequences"], setup_parameters["seq_len"], markov_key)
+    
+    filter = lambda x, key : ~jnp.any(x[:10] == 3)
+    key, filter_key = jax.random.split(key)
+    filtered_train_sequences = data_gen.jax_generate_filtered_markov_matrix(
+        setup_parameters["seq_len"], 
+        setup_parameters["sequences"], 
+        filter, 
+        filter_key)
+    
     print("Data generated")
-    train_key, key = jax.random.split(key)
+    train_key, train_key_filtered, key = jax.random.split(key, 3)
     model, _, _ = training_loop(model, opt_state, optimizer, train_sequences, training_parameters, train_key)
+    print("Original model trained")
+    model_filtered, _, _ = training_loop(model_filtered, opt_state_filtered, optimizer_filtered, filtered_train_sequences, training_parameters, train_key_filtered)
+    print("Filtered model trained")
     save_model(model, "model.eqx")
+    save_model(model_filtered, "model_filtered.eqx")
     print("Model saved")
 
 key = later_key
